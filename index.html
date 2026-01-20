@@ -16,7 +16,43 @@
     <link rel="stylesheet" href="css/styles.css?v=1.1">
 </head>
 
-<body>
+<script>
+  // 1. Configuración de la URL
+  const N8N_WEBHOOK_URL = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ad75122a-497e-41ee-9d8d-3f254f51b366";
+
+  // 2. Selección del formulario (cambia 'miFormulario' por el ID real de tu form)
+  const formulario = document.getElementById('miFormulario');
+
+  formulario.addEventListener('submit', async (e) => {
+    e.preventDefault(); // Evita que la web se recargue
+
+    // Recopilar los datos automáticamente
+    const formData = new FormData(formulario);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+      // Enviar datos a n8n
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        alert("¡Enviado con éxito!");
+        formulario.reset(); // Limpia el formulario
+      } else {
+        alert("Error al enviar: " + response.statusText);
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+      alert("No se pudo conectar con el servidor de n8n.");
+    }
+  });
+</script>
+    <body>
 
     <!-- Header / Navigation -->
     <header id="header">
