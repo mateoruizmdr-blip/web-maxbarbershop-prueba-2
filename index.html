@@ -15,43 +15,33 @@
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css?v=1.1">
 </head>
+    
 <script>
-  const N8N_WEBHOOK_URL = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/6ffca2b8-3a7d-487c-b8d4-5f9154d2cb4a";
+  const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ad75122a-497e-41ee-9d8d-3f254f51b366";
 
-  // Cambia 'miFormulario' por el ID real de tu <form>
-  const formulario = document.getElementById('miFormulario');
-
-  if (!formulario) {
-    console.error("¡ERROR: No se encontró ningún formulario con el ID 'miFormulario'!");
-  } else {
-    formulario.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      console.log("Formulario detectado, enviando datos...");
-
-      const formData = new FormData(formulario);
-      const data = Object.fromEntries(formData.entries());
-
-      try {
-        const response = await fetch(N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-
-        console.log("Estado de la respuesta:", response.status);
-        
-        if (response.ok) {
-          alert("¡Enviado!");
-        } else {
-          alert("Error: " + response.status);
-        }
-      } catch (error) {
-        console.error("Error en la petición Fetch:", error);
-        alert("Error de conexión. Revisa la consola (F12).");
-      }
-    });
-  }
+  // Cambia 'miFormulario' por el ID de tu form
+  document.getElementById('miFormulario').onclick = async (e) => {
+    // Si usas un botón tipo submit, mejor usa el evento 'submit' en el form
+    // Pero para probar, esto enviará un test manual:
+    
+    console.log("Intentando enviar test a n8n...");
+    
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prueba: "Hola n8n", estado: "funciona" })
+      });
+      
+      const texto = await res.text();
+      console.log("Respuesta de n8n:", texto);
+      alert("Respuesta recibida: " + texto);
+    } catch (err) {
+      console.error("Error al conectar:", err);
+    }
+  };
 </script>
+    
     <body>
 
     <!-- Header / Navigation -->
