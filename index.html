@@ -17,36 +17,45 @@
 </head>
 
     <body>
-        
-    <script>
-  // Añadimos esto para que espere a que el HTML cargue
-  window.onload = function() {
-      const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/b3a3ee38-5ca0-47bf-83bb-28a4139139c7";
+<script>
+window.onload = function() {
+    const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/b3a3ee38-5ca0-47bf-83bb-28a4139139c7";
 
-      const formElement = document.getElementById('miFormulario');
+    // Cambiado a 'bookingForm' para que coincida con tu HTML
+    const formElement = document.getElementById('bookingForm');
 
-      if (formElement) {
-          formElement.onclick = async (e) => {
-              console.log("Intentando enviar test a n8n...");
-              try {
-                  const res = await fetch(url, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ prueba: "Hola n8n", estado: "funciona" })
-                  });
+    if (formElement) {
+        // Usamos onsubmit para capturar el envío del formulario
+        formElement.onsubmit = async (e) => {
+            e.preventDefault(); // EVITA que la página se recargue
+            
+            console.log("Enviando datos a n8n...");
+            
+            // Recogemos los datos reales del formulario
+            const formData = new FormData(formElement);
+            const datos = Object.fromEntries(formData.entries());
 
-                  const texto = await res.text();
-                  console.log("Respuesta de n8n:", texto);
-                  alert("Respuesta recibida: " + texto);
-              } catch (err) {
-                  console.error("Error al conectar:", err);
-              }
-          };
-      } else {
-          console.error("No se encontró el elemento con ID 'miFormulario'");
-      }
-  };
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos) // Enviamos los datos reales del cliente
+                });
+
+                const texto = await res.text();
+                console.log("Respuesta de n8n:", texto);
+                alert("¡Cita enviada con éxito!");
+            } catch (err) {
+                console.error("Error al conectar con n8n:", err);
+                alert("Error al conectar con el servidor.");
+            }
+        };
+    } else {
+        console.error("No se encontró el elemento 'bookingForm'");
+    }
+};
 </script>
+        
     <!-- Header / Navigation -->
     <header id="header">
         <div class="container">
