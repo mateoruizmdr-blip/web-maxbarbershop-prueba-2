@@ -18,32 +18,35 @@
 
     <body>
         
-        <script>
-  const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ad75122a-497e-41ee-9d8d-3f254f51b366";
+    <script>
+  // Añadimos esto para que espere a que el HTML cargue
+  window.onload = function() {
+      const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ad75122a-497e-41ee-9d8d-3f254f51b366";
 
-  // Cambia 'miFormulario' por el ID de tu form
-  document.getElementById('miFormulario').onclick = async (e) => {
-    // Si usas un botón tipo submit, mejor usa el evento 'submit' en el form
-    // Pero para probar, esto enviará un test manual:
-    
-    console.log("Intentando enviar test a n8n...");
-    
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prueba: "Hola n8n", estado: "funciona" })
-      });
-      
-      const texto = await res.text();
-      console.log("Respuesta de n8n:", texto);
-      alert("Respuesta recibida: " + texto);
-    } catch (err) {
-      console.error("Error al conectar:", err);
-    }
+      const formElement = document.getElementById('miFormulario');
+
+      if (formElement) {
+          formElement.onclick = async (e) => {
+              console.log("Intentando enviar test a n8n...");
+              try {
+                  const res = await fetch(url, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ prueba: "Hola n8n", estado: "funciona" })
+                  });
+
+                  const texto = await res.text();
+                  console.log("Respuesta de n8n:", texto);
+                  alert("Respuesta recibida: " + texto);
+              } catch (err) {
+                  console.error("Error al conectar:", err);
+              }
+          };
+      } else {
+          console.error("No se encontró el elemento con ID 'miFormulario'");
+      }
   };
 </script>
-
     <!-- Header / Navigation -->
     <header id="header">
         <div class="container">
