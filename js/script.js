@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    
+
     // --- Mobile Menu ---
     const hamburger = document.querySelector('.hamburger');
     const mobileMenu = document.querySelector('.mobile-menu');
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateTimeSlots() {
         const selectedDate = dateInput.value;
         const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
-        
+
         // Reset time select
         timeSelect.innerHTML = '';
         timeSelect.disabled = true;
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Opening hours 11:00 to 21:00
         const startHour = 11;
         const endHour = 21;
-        
+
         const now = new Date();
         const isToday = selectedDate === today;
         const currentHour = now.getHours();
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         while (iterTime < endTime) {
             // Check if slot is in the past (only for today) + 1 hour buffer
             // "No dejes que se reserve a partir del día actual dentro de 1 hora"
-            
+
             let slotValid = true;
             if (isToday) {
                 // Calculate time difference in minutes
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hours = iterTime.getHours().toString().padStart(2, '0');
                 const minutes = iterTime.getMinutes().toString().padStart(2, '0');
                 const timeString = `${hours}:${minutes}`;
-                
+
                 const option = document.createElement('option');
                 option.value = timeString;
                 option.text = timeString;
@@ -114,49 +114,62 @@ document.addEventListener('DOMContentLoaded', () => {
     serviceSelect.addEventListener('change', updateTimeSlots);
     dateInput.addEventListener('change', updateTimeSlots);
 
+    // --- Modal Logic ---
+    const modal = document.getElementById('infoModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const closeModalElements = document.querySelectorAll('.close-modal, #closeModalBtn');
+
+    function showModal(title, msg) {
+        modalTitle.textContent = title;
+        modalMessage.textContent = msg;
+        modal.style.display = 'flex'; // Use flex to center
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    closeModalElements.forEach(el => {
+        el.addEventListener('click', closeModal);
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
     // Handle Form Submit
     bookingForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        
-        // Simple client-side validation simulation
+
         const formData = new FormData(bookingForm);
         const name = formData.get('name');
         const time = formData.get('time');
-        
+
         if (!time) {
-            showBookingMessage('Por favor selecciona una hora válida.', 'error');
+            // showBookingMessage('Por favor selecciona una hora válida.', 'error');
+            showModal('Error', 'Por favor selecciona una hora válida.');
             return;
         }
 
         // Simulate API call
-        // In a real app, send data to backend here
-        
-        showBookingMessage(`¡Reserva Confirmada! Gracias ${name}, te esperamos a las ${time}.`, 'success');
+        showModal('¡Reserva Confirmada!', `Gracias ${name}, tu cita ha sido reservada para las ${time}.`);
+
         bookingForm.reset();
         timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
         timeSelect.disabled = true;
     });
 
-    function showBookingMessage(msg, type) {
-        bookingMessage.textContent = msg;
-        bookingMessage.className = `message ${type}`;
-        setTimeout(() => {
-            bookingMessage.style.display = 'none';
-        }, 5000);
-    }
-
     // Handle Cancel Form
     cancelForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = document.getElementById('cancelEmail').value;
-        
-        // Simulate cancellation
-        cancelMessage.textContent = `Se ha enviado un correo de cancelación a ${email} (Simulado).`;
-        cancelMessage.className = 'message success';
+
+        showModal('Cancelación', `Se ha tramitado la cancelación para el correo ${email}. Recibirás confirmación en breve.`);
+
         cancelForm.reset();
-        setTimeout(() => {
-            cancelMessage.style.display = 'none';
-        }, 5000);
     });
 
 });
