@@ -144,22 +144,75 @@ document.addEventListener('DOMContentLoaded', () => {
     bookingForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
-        const formData = new FormData(bookingForm);
-        const name = formData.get('name');
-        const time = formData.get('time');
+        // TU WEBHOOK DE N8N AQUÍ (Cámbialo si es diferente)
+        // Puedes usar: https://n8n.tu-dominio.com/webhook/...
+        // Si no tienes uno, esto dará error en la consola, pero simulará el éxito visualmente para que veas el diseño.
+        // Ejemplo de webhook de prueba: 'https://hook.eu1.make.com/...' (Usaré un placeholder)
+        const WEBHOOK_URL = 'PON_TU_URL_AQUI';
 
-        if (!time) {
-            // showBookingMessage('Por favor selecciona una hora válida.', 'error');
+        const formData = new FormData(bookingForm);
+        const submitBtn = bookingForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.textContent;
+
+        const data = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            employee: formData.get('employee'),
+            service: formData.get('service'),
+            // Get text from selected option for better context
+            serviceName: serviceSelect.options[serviceSelect.selectedIndex].text,
+            date: formData.get('date'),
+            time: formData.get('time')
+        };
+
+        if (!data.time) {
             showModal('Error', 'Por favor selecciona una hora válida.');
             return;
         }
 
-        // Simulate API call
-        showModal('¡Reserva Confirmada!', `Gracias ${name}, tu cita ha sido reservada para las ${time}.`);
+        // Loading State
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ENVIANDO...';
 
-        bookingForm.reset();
-        timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
-        timeSelect.disabled = true;
+        // Intentar enviar (Si no hay URL válida configurada, avisar)
+        if (WEBHOOK_URL === 'PON_TU_URL_AQUI') {
+            // Simulación para demostración si el usuario no ha puesto la URL aún
+            setTimeout(() => {
+                showModal('¡Reserva Confirmada (Demo)!', `Gracias ${data.name}. Configura la variable WEBHOOK_URL en script.js para que llegue el correo real.`);
+                bookingForm.reset();
+                timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
+                timeSelect.disabled = true;
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }, 2000);
+            return;
+        }
+
+        fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+            .then(response => {
+                if (response.ok) {
+                    showModal('¡Reserva Confirmada!', `Gracias ${data.name}, tu cita ha sido reservada para el ${data.date} a las ${data.time}.`);
+                    bookingForm.reset();
+                    timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
+                    timeSelect.disabled = true;
+                } else {
+                    throw new Error('Error en el servidor');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showModal('Error', 'Hubo un problema al enviar la reserva. Por favor intenta de nuevo o llama al local.');
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            });
     });
 
     // Handle Cancel Form
