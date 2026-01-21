@@ -20,38 +20,43 @@
 <script>
 window.onload = function() {
     const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745";
-
-    // Cambiado a 'bookingForm' para que coincida con tu HTML
     const formElement = document.getElementById('bookingForm');
 
     if (formElement) {
-        // Usamos onsubmit para capturar el envío del formulario
         formElement.onsubmit = async (e) => {
-            e.preventDefault(); // EVITA que la página se recargue
+            e.preventDefault(); // Evita que la página se refresque
             
-            console.log("Enviando datos a n8n...");
-            
-            // Recogemos los datos reales del formulario
-            const formData = new FormData(formElement);
-            const datos = Object.fromEntries(formData.entries());
+            // EXTRAEMOS LOS DATOS MANUALMENTE PARA EVITAR QUE LLEGUEN VACÍOS
+            const datosCita = {
+                nombre: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                barbero: document.getElementById('employee').value,
+                servicio: document.getElementById('service').value,
+                fecha: document.getElementById('date').value,
+                hora: document.getElementById('time').value
+            };
+
+            console.log("Enviando datos:", datosCita);
 
             try {
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(datos) // Enviamos los datos reales del cliente
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(datosCita)
                 });
 
-                const texto = await res.text();
-                console.log("Respuesta de n8n:", texto);
-                alert("¡Cita enviada con éxito!");
+                if (res.ok) {
+                    console.log("Datos recibidos por n8n");
+                    alert("¡Cita enviada con éxito!");
+                }
             } catch (err) {
-                console.error("Error al conectar con n8n:", err);
-                alert("Error al conectar con el servidor.");
+                console.error("Error de conexión:", err);
+                alert("Hubo un error al enviar la cita.");
             }
         };
-    } else {
-        console.error("No se encontró el elemento 'bookingForm'");
     }
 };
 </script>
