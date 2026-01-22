@@ -20,17 +20,16 @@
 
 <body>
 <script>
-  // CONFIGURACIÓN: Sustituye estas URLs por tus Webhooks de n8n
-  const URL_RESERVAR = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745";
-  const URL_CONSULTAR_HORAS = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718"; // <--- Pon aquí la URL de tu segundo workflow
+  // CONFIGURACIÓN: Cambia estas URLs por tus URLs de PRODUCCIÓN de n8n
+  const URL_RESERVAR = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook/eee10825-ff7e-4622-8ba9-37596ffd9745";
+  const URL_CONSULTAR = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718"; // <-- Ponla aquí
 
   const bookingForm = document.getElementById('bookingForm');
   const dateInput = document.getElementById('date');
   const employeeSelect = document.getElementById('employee');
-  const serviceSelect = document.getElementById('service');
   const timeSelect = document.getElementById('time');
 
-  // 1. FUNCIÓN PARA ACTUALIZAR HORAS LIBRES
+  // 1. FUNCIÓN PARA BLOQUEAR HORAS OCUPADAS
   async function actualizarDisponibilidad() {
     const fecha = dateInput.value;
     const barbero = employeeSelect.value;
@@ -38,13 +37,13 @@
     if (!fecha || !barbero || barbero === "Cualquiera") return;
 
     timeSelect.disabled = true;
-    timeSelect.innerHTML = '<option>Cargando...</option>';
+    timeSelect.innerHTML = '<option>Consultando huecos...</option>';
 
     try {
-      const response = await fetch(URL_CONSULTAR_HORAS, {
+      const response = await fetch(URL_CONSULTAR, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fecha: fecha, barbero: barbero })
+        body: JSON.stringify({ fecha, barbero })
       });
 
       const data = await response.json();
@@ -61,6 +60,7 @@
         if (ocupadas.includes(h)) {
           option.disabled = true;
           option.text = h + " (Ocupado)";
+          option.style.color = "#888";
         } else {
           option.text = h;
         }
@@ -69,16 +69,16 @@
       timeSelect.disabled = false;
 
     } catch (error) {
-      console.error("Error consultando disponibilidad:", error);
-      timeSelect.innerHTML = '<option>Error al cargar</option>';
+      console.error("Error disponibilidad:", error);
+      timeSelect.innerHTML = '<option>Error al cargar disponibilidad</option>';
     }
   }
 
-  // Escuchar cambios para refrescar horas
+  // 2. ESCUCHAR CAMBIOS EN EL FORMULARIO
   dateInput.addEventListener('change', actualizarDisponibilidad);
   employeeSelect.addEventListener('change', actualizarDisponibilidad);
 
-  // 2. FUNCIÓN PARA ENVIAR LA RESERVA
+  // 3. FUNCIÓN PARA ENVIAR LA RESERVA FINAL
   bookingForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -86,7 +86,7 @@
       nombre: document.getElementById('name').value,
       email: document.getElementById('email').value,
       barbero: employeeSelect.value,
-      servicio: serviceSelect.options[serviceSelect.selectedIndex].text,
+      servicio: document.getElementById('service').options[document.getElementById('service').selectedIndex].text,
       fecha: dateInput.value,
       hora: timeSelect.value
     };
@@ -99,13 +99,15 @@
       });
 
       if (response.ok) {
-        alert("¡Reserva confirmada! Revisa tu email.");
+        alert("¡Reserva confirmada con éxito!");
         bookingForm.reset();
+        timeSelect.disabled = true;
       } else {
-        alert("Error en la reserva.");
+        alert("Lo sentimos, no pudimos procesar tu reserva. Inténtalo de nuevo.");
       }
     } catch (error) {
-      alert("No se pudo conectar con el servidor.");
+      console.error("Error en reserva:", error);
+      alert("Error de conexión con el servidor.");
     }
   });
 </script>
