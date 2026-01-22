@@ -19,7 +19,52 @@
 </head>
 
 <body>
+<script>
+  // 1. Pega aquí la URL que copiaste de n8n
+  const N8N_WEBHOOK_URL = "AQUÍ_PEGA_TU_URL_DE_N8N";
 
+  const btnReservar = document.getElementById('btn-reservar');
+
+  btnReservar.addEventListener('click', async (e) => {
+    e.preventDefault(); // Evita que la página se recargue
+
+    // 2. Recogemos los valores de los campos
+    const datosCita = {
+      nombre: document.getElementById('nombre').value,
+      email: document.getElementById('email').value,
+      barbero: document.getElementById('barbero').value,
+      servicio: document.getElementById('servicio').value,
+      fecha: document.getElementById('fecha').value,
+      hora: document.getElementById('hora').value
+    };
+
+    // Validación básica
+    if (!datosCita.nombre || !datosCita.email || !datosCita.fecha) {
+      alert("Por favor, completa los campos principales.");
+      return;
+    }
+
+    try {
+      // 3. Enviamos los datos a n8n mediante POST
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datosCita)
+      });
+
+      if (response.ok) {
+        alert("¡Reserva enviada con éxito! Te llegará un correo de confirmación.");
+      } else {
+        alert("Hubo un problema con la reserva. Inténtalo de nuevo.");
+      }
+    } catch (error) {
+      console.error("Error conectando con n8n:", error);
+      alert("No se pudo conectar con el servidor de reservas.");
+    }
+  });
+</script>
     <!-- Header / Navigation -->
     <header id="header">
         <div class="container">
