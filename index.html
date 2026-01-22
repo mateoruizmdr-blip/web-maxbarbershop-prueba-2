@@ -17,50 +17,111 @@
 </head>
 
     <body>
-<script>
-window.onload = function() {
-    const url = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745";
-    const formElement = document.getElementById('bookingForm');
+      <script>  
+     window.onload = function() {
+    const urlReserva = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745";
+    const urlConsulta = "https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718";
 
+    const formElement = document.getElementById('bookingForm');
+    const dateInput = document.getElementById('date');
+    const employeeInput = document.getElementById('employee');
+    const serviceSelect = document.getElementById('service');
+    const timeSelect = document.getElementById('time');
+
+    // Función para consultar disponibilidad real
+    async function consultarDisponibilidad() {
+        const fecha = dateInput.value;
+        const barbero = employeeInput.value;
+        const servicioOption = serviceSelect.options[serviceSelect.selectedIndex];
+        const duracionReserva = parseInt(servicioOption.getAttribute('data-duration'));
+
+        if (!fecha || !barbero || !duracionReserva) return;
+
+        timeSelect.innerHTML = '<option>Consultando agenda...</option>';
+        timeSelect.disabled = true;
+
+        try {
+            const res = await fetch(urlConsulta, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha, barbero })
+            });
+
+            if (res.ok) {
+                const eventosOcupados = await res.json(); // n8n devuelve [{start: "HH:mm", end: "HH:mm"}, ...]
+                generarHorariosDisponibles(eventosOcupados, duracionReserva);
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            timeSelect.innerHTML = '<option>Error al cargar horas</option>';
+        }
+    }
+
+    function generarHorariosDisponibles(ocupados, duracionSolicitada) {
+        timeSelect.innerHTML = '<option value="" disabled selected>Elige una hora</option>';
+        
+        // Generamos tramos cada 15 minutos (puedes ajustarlo a 10 si prefieres)
+        for (let h = 11; h < 21; h++) {
+            for (let m = 0; m < 60; m += 15) {
+                let hh = h.toString().padStart(2, '0');
+                let mm = m.toString().padStart(2, '0');
+                let horaInicio = `${hh}:${mm}`;
+                
+                // Calculamos cuándo terminaría esta cita si empezara aquí
+                let dateInicio = new Date(`2000-01-01T${horaInicio}`);
+                let dateFin = new Date(dateInicio.getTime() + duracionSolicitada * 60000);
+                let horaFin = dateFin.toTimeString().substring(0, 5);
+
+                // Verificamos si este bloque choca con alguna cita de Google Calendar
+                const choca = ocupados.some(evento => {
+                    return (horaInicio < evento.end && horaFin > evento.start);
+                });
+
+                if (!choca) {
+                    let option = document.createElement('option');
+                    option.value = horaInicio;
+                    option.textContent = horaInicio;
+                    timeSelect.appendChild(option);
+                }
+            }
+        }
+        timeSelect.disabled = false;
+    }
+
+    // Eventos para disparar la consulta
+    dateInput.onchange = consultarDisponibilidad;
+    employeeInput.onchange = consultarDisponibilidad;
+    serviceSelect.onchange = consultarDisponibilidad;
+
+    // Lógica de envío (la que ya tenías)
     if (formElement) {
         formElement.onsubmit = async (e) => {
-            e.preventDefault(); // Evita que la página se refresque
-            
-            // EXTRAEMOS LOS DATOS MANUALMENTE PARA EVITAR QUE LLEGUEN VACÍOS
+            e.preventDefault();
             const datosCita = {
                 nombre: document.getElementById('name').value,
                 email: document.getElementById('email').value,
                 barbero: document.getElementById('employee').value,
-                servicio: document.getElementById('service').value,
-                fecha: document.getElementById('date').value,
-                hora: document.getElementById('time').value
+                servicio: serviceSelect.options[serviceSelect.selectedIndex].text,
+                duracion: serviceSelect.options[serviceSelect.selectedIndex].getAttribute('data-duration'),
+                fecha: dateInput.value,
+                hora: timeSelect.value
             };
 
-            console.log("Enviando datos:", datosCita);
-
             try {
-                const res = await fetch(url, {
+                const res = await fetch(urlReserva, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(datosCita)
                 });
-
-                if (res.ok) {
-                    console.log("Datos recibidos por n8n");
-                    alert("¡Cita enviada con éxito!");
-                }
+                if (res.ok) alert("¡Cita reservada!");
             } catch (err) {
-                console.error("Error de conexión:", err);
-                alert("Hubo un error al enviar la cita.");
+                alert("Error al enviar");
             }
         };
     }
 };
-</script>
-        
+         <script>
+             
     <!-- Header / Navigation -->
     <header id="header">
         <div class="container">
