@@ -1,107 +1,103 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Configuration ---
+    const N8N_WEBHOOK_URL = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745';
 
-    // --- Mobile Menu ---
+    // --- Selectors ---
+    const html = document.documentElement;
+    const header = document.getElementById('header');
     const hamburger = document.querySelector('.hamburger');
     const mobileMenu = document.querySelector('.mobile-menu');
     const closeMenu = document.querySelector('.close-menu');
     const menuLinks = document.querySelectorAll('.mobile-menu a');
 
-    hamburger.addEventListener('click', () => {
-        mobileMenu.classList.add('active');
-    });
-
-    closeMenu.addEventListener('click', () => {
-        mobileMenu.classList.remove('active');
-    });
-
-    menuLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            mobileMenu.classList.remove('active');
-        });
-    });
-
-    // --- Booking System Logic ---
+    // Booking Form
+    const bookingForm = document.getElementById('bookingForm');
     const serviceSelect = document.getElementById('service');
     const dateInput = document.getElementById('date');
     const timeSelect = document.getElementById('time');
-    const bookingForm = document.getElementById('bookingForm');
-    const bookingMessage = document.getElementById('bookingMessage');
+
+    // Cancel Form
     const cancelForm = document.getElementById('cancelForm');
-    const cancelMessage = document.getElementById('cancelMessage');
+
+    // Modal
+    const modal = document.getElementById('infoModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const closeModalElements = document.querySelectorAll('.close-modal, #closeModalBtn');
+
+    // --- Scroll Effects ---
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 50) {
+            header.classList.add('scrolled');
+        } else {
+            header.classList.remove('scrolled');
+        }
+    });
+
+    // --- Mobile Menu Logic ---
+    const toggleMenu = (show) => {
+        mobileMenu.classList.toggle('active', show);
+        document.body.style.overflow = show ? 'hidden' : '';
+    };
+
+    hamburger.addEventListener('click', () => toggleMenu(true));
+    closeMenu.addEventListener('click', () => toggleMenu(false));
+    menuLinks.forEach(link => link.addEventListener('click', () => toggleMenu(false)));
+
+    // --- Booking System Logic ---
 
     // Restrict date to today onwards
     const today = new Date().toISOString().split('T')[0];
     dateInput.setAttribute('min', today);
 
-    // Update time slots when service or date changes
     function updateTimeSlots() {
         const selectedDate = dateInput.value;
         const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
 
-        // Reset time select
         timeSelect.innerHTML = '';
         timeSelect.disabled = true;
 
         if (!selectedDate || !selectedServiceOption.value) {
-            const defaultOption = document.createElement('option');
-            defaultOption.text = "Selecciona servicio y fecha primero";
-            timeSelect.add(defaultOption);
+            timeSelect.innerHTML = '<option value="">Primero elige servicio y fecha</option>';
             return;
         }
 
-        const durationMinutes = parseInt(selectedServiceOption.getAttribute('data-duration'));
-        const interval = durationMinutes; // "si la cita es de 15 min que deje seleccionar de 15 en 15..."
-
-        // Opening hours 11:00 to 21:00
+        const duration = parseInt(selectedServiceOption.getAttribute('data-duration')) || 30;
         const startHour = 11;
         const endHour = 21;
 
         const now = new Date();
         const isToday = selectedDate === today;
-        const currentHour = now.getHours();
-        const currentMinutes = now.getMinutes();
 
-        let startTime = new Date(selectedDate);
-        startTime.setHours(startHour, 0, 0, 0);
+        let iterTime = new Date(selectedDate);
+        iterTime.setHours(startHour, 0, 0, 0);
 
         let endTime = new Date(selectedDate);
         endTime.setHours(endHour, 0, 0, 0);
-
-        let iterTime = new Date(startTime);
-        let hasSlots = false;
 
         const defaultOption = document.createElement('option');
         defaultOption.value = "";
         defaultOption.text = "Selecciona una hora";
         timeSelect.add(defaultOption);
 
-        while (iterTime < endTime) {
-            // Check if slot is in the past (only for today) + 1 hour buffer
-            // "No dejes que se reserve a partir del día actual dentro de 1 hora"
+        let hasSlots = false;
 
+        while (iterTime < endTime) {
             let slotValid = true;
             if (isToday) {
-                // Calculate time difference in minutes
                 const timeDiff = (iterTime - now) / 1000 / 60;
-                if (timeDiff < 60) {
-                    slotValid = false;
-                }
+                if (timeDiff < 60) slotValid = false; // Block if within 1 hour
             }
 
             if (slotValid) {
-                const hours = iterTime.getHours().toString().padStart(2, '0');
-                const minutes = iterTime.getMinutes().toString().padStart(2, '0');
-                const timeString = `${hours}:${minutes}`;
-
+                const timeStr = iterTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
                 const option = document.createElement('option');
-                option.value = timeString;
-                option.text = timeString;
+                option.value = timeStr;
+                option.text = timeStr;
                 timeSelect.add(option);
                 hasSlots = true;
             }
-
-            // Increment time by service duration
-            iterTime.setMinutes(iterTime.getMinutes() + interval);
+            iterTime.setMinutes(iterTime.getMinutes() + duration);
         }
 
         if (hasSlots) {
@@ -114,115 +110,75 @@ document.addEventListener('DOMContentLoaded', () => {
     serviceSelect.addEventListener('change', updateTimeSlots);
     dateInput.addEventListener('change', updateTimeSlots);
 
-    // --- Modal Logic ---
-    const modal = document.getElementById('infoModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalMessage = document.getElementById('modalMessage');
-    const closeModalElements = document.querySelectorAll('.close-modal, #closeModalBtn');
-
-    function showModal(title, msg) {
+    // --- Modal Helpers ---
+    const showModal = (title, msg) => {
         modalTitle.textContent = title;
         modalMessage.textContent = msg;
-        modal.style.display = 'flex'; // Use flex to center
-    }
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    };
 
-    function closeModal() {
-        modal.style.display = 'none';
-    }
+    const closeModal = () => {
+        modal.classList.remove('active');
+        setTimeout(() => modal.style.display = 'none', 300);
+    };
 
-    closeModalElements.forEach(el => {
-        el.addEventListener('click', closeModal);
-    });
+    closeModalElements.forEach(el => el.addEventListener('click', closeModal));
+    window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
-    window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
-    });
+    // --- Form Submissions ---
 
-    // Handle Form Submit
-    bookingForm.addEventListener('submit', (e) => {
+    bookingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // TU WEBHOOK DE N8N AQUÍ (Cámbialo si es diferente)
-        // Puedes usar: https://n8n.tu-dominio.com/webhook/...
-        // Si no tienes uno, esto dará error en la consola, pero simulará el éxito visualmente para que veas el diseño.
-        // Ejemplo de webhook de prueba: 'https://hook.eu1.make.com/...' (Usaré un placeholder)
-        const WEBHOOK_URL = 'PON_TU_URL_AQUI';
-
-        const formData = new FormData(bookingForm);
         const submitBtn = bookingForm.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.textContent;
+        const originalText = submitBtn.innerHTML;
 
         const data = {
-            name: formData.get('name'),
-            email: formData.get('email'),
-            employee: formData.get('employee'),
-            service: formData.get('service'),
-            // Get text from selected option for better context
-            serviceName: serviceSelect.options[serviceSelect.selectedIndex].text,
-            date: formData.get('date'),
-            time: formData.get('time')
+            nombre: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            barbero: document.getElementById('employee').value,
+            servicio: serviceSelect.options[serviceSelect.selectedIndex].text,
+            fecha: dateInput.value,
+            hora: timeSelect.value
         };
 
-        if (!data.time) {
-            showModal('Error', 'Por favor selecciona una hora válida.');
+        if (!data.hora) {
+            showModal('Atención', 'Por favor, selecciona una hora para tu cita.');
             return;
         }
 
-        // Loading State
+        // UI Feedback
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ENVIANDO...';
+        submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> PROCESANDO...';
 
-        // Intentar enviar (Si no hay URL válida configurada, avisar)
-        if (WEBHOOK_URL === 'PON_TU_URL_AQUI') {
-            // Simulación para demostración si el usuario no ha puesto la URL aún
-            setTimeout(() => {
-                showModal('¡Reserva Confirmada (Demo)!', `Gracias ${data.name}. Configura la variable WEBHOOK_URL en script.js para que llegue el correo real.`);
-                bookingForm.reset();
-                timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
-                timeSelect.disabled = true;
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalBtnText;
-            }, 2000);
-            return;
-        }
-
-        fetch(WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        })
-            .then(response => {
-                if (response.ok) {
-                    showModal('¡Reserva Confirmada!', `Gracias ${data.name}, tu cita ha sido reservada para el ${data.date} a las ${data.time}.`);
-                    bookingForm.reset();
-                    timeSelect.innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
-                    timeSelect.disabled = true;
-                } else {
-                    throw new Error('Error en el servidor');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showModal('Error', 'Hubo un problema al enviar la reserva. Por favor intenta de nuevo o llama al local.');
-            })
-            .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalBtnText;
+        try {
+            const response = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
+
+            if (response.ok) {
+                showModal('¡Cita Confirmada!', `Hola ${data.nombre}, tu cita ha sido reservada con éxito para el ${data.fecha} a las ${data.hora}.`);
+                bookingForm.reset();
+                updateTimeSlots();
+            } else {
+                throw new Error('Server error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showModal('Error', 'No hemos podido procesar tu reserva. Inténtalo de nuevo o contacta con nosotros directamente.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
     });
 
-    // Handle Cancel Form
     cancelForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = document.getElementById('cancelEmail').value;
-
-        showModal('Cancelación', `Se ha tramitado la cancelación para el correo ${email}. Recibirás confirmación en breve.`);
-
+        showModal('Cancelación en proceso', `Hemos recibido tu solicitud para el correo ${email}. Nuestro equipo la procesará a la brevedad.`);
         cancelForm.reset();
     });
-
 });
