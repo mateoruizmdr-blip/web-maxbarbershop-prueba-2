@@ -7,11 +7,21 @@
 const WEBHOOK_GET_EVENTS = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745';
 const WEBHOOK_CREATE_APPOINTMENT = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718';
 
+// Duraciones de servicios en minutos
+const SERVICE_DURATIONS = {
+    "Corte de pelo": 30,
+    "Corte y barba": 40,
+    "Corte de barba": 15,
+    "Cejas": 10,
+    "Jubilados": 20
+};
+
 // Variables globales
 let occupiedSlots = {}; // Almacenará las horas ocupadas por barbero
 let currentDate = null;
 let currentEmployee = null;
 let currentService = null;
+let currentServiceDuration = null;
 
 // ========================================
 // INICIALIZACIÓN
@@ -79,14 +89,21 @@ function processOccupiedSlots(events) {
     events.forEach(event => {
         const barber = event.calendar || event.barbero;
         const startTime = new Date(event.start || event.inicio);
+        const endTime = event.end ? new Date(event.end) : null;
         const date = startTime.toISOString().split('T')[0];
         const time = startTime.toTimeString().slice(0, 5);
+        
+        // Calcular duración del evento en minutos
+        const duration = endTime ? Math.round((endTime - startTime) / (1000 * 60)) : 30;
 
         if (occupiedSlots[barber]) {
             if (!occupiedSlots[barber][date]) {
                 occupiedSlots[barber][date] = [];
             }
-            occupiedSlots[barber][date].push(time);
+            occupiedSlots[barber][date].push({
+                time: time,
+                duration: duration
+            });
         }
     });
 
@@ -120,7 +137,10 @@ function setupEventListeners() {
 
     // Listener para cambios en servicio
     serviceSelect.addEventListener('change', function() {
-        currentService = this.options[this.selectedIndex];
+        const selectedOption = this.options[this.selectedIndex];
+        currentService = selectedOption.text.split(' - ')[0]; // Extrae solo el nombre del servicio
+        currentServiceDuration = SERVICE_DURATIONS[currentService] || 30;
+        console.log('Servicio seleccionado:', currentService, 'Duración:', currentServiceDuration);
         updateAvailableSlots();
     });
 
@@ -147,20 +167,19 @@ function setupEventListeners() {
 function updateAvailableSlots() {
     const timeSelect = document.getElementById('time');
     
-    if (!currentService || !currentDate || !currentEmployee) {
+    if (!currentService || !currentDate || !currentEmployee || !currentServiceDuration) {
         timeSelect.disabled = true;
         timeSelect.innerHTML = '<option value="">Selecciona servicio, barbero y fecha primero</option>';
         return;
     }
 
-    const duration = parseInt(currentService.dataset.duration);
-    const availableSlots = generateTimeSlots(currentDate, currentEmployee, duration);
+    const availableSlots = generateTimeSlots(currentDate, currentEmployee, currentServiceDuration);
     
     timeSelect.disabled = false;
     timeSelect.innerHTML = '';
 
     if (availableSlots.length === 0) {
-        timeSelect.innerHTML = '<option value="">No hay disponibilidad</option>';
+        timeSelect.innerHTML = '<option value="">No hay disponibilidad para este día</option>';
         timeSelect.disabled = true;
     } else {
         timeSelect.innerHTML = '<option value="">Selecciona una hora</option>';
@@ -175,14 +194,16 @@ function updateAvailableSlots() {
 
 function generateTimeSlots(date, employee, serviceDuration) {
     const slots = [];
-    const dayOfWeek = new Date(date).getDay();
+    const dayOfWeek = new Date(date + 'T00:00:00').getDay();
     
     // Horario: 11:00 - 21:00, Domingo cerrado
     if (dayOfWeek === 0) return slots;
 
     const openTime = 11 * 60; // 11:00 en minutos
     const closeTime = 21 * 60; // 21:00 en minutos
-    const interval = 15; // Intervalos de 15 minutos
+    
+    // EL INTERVALO ES LA DURACIÓN DEL SERVICIO
+    const interval = serviceDuration;
 
     // Obtener horas ocupadas para este barbero y fecha
     const occupied = getOccupiedSlotsForEmployeeAndDate(employee, date);
@@ -195,7 +216,7 @@ function generateTimeSlots(date, employee, serviceDuration) {
         // Verificar si hay suficiente tiempo antes del cierre
         if (minutes + serviceDuration <= closeTime) {
             // Verificar si esta hora está disponible
-            if (!isSlotOccupied(timeStr, serviceDuration, occupied)) {
+            if (!isSlotOccupied(minutes, serviceDuration, occupied)) {
                 slots.push(timeStr);
             }
         }
@@ -213,24 +234,30 @@ function getOccupiedSlotsForEmployeeAndDate(employee, date) {
                 allOccupied = allOccupied.concat(occupiedSlots[barber][date]);
             }
         });
-        return [...new Set(allOccupied)]; // Eliminar duplicados
+        return allOccupied;
     }
     
     return occupiedSlots[employee]?.[date] || [];
 }
 
-function isSlotOccupied(timeStr, duration, occupiedTimes) {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const startMinutes = hours * 60 + minutes;
-    const endMinutes = startMinutes + duration;
+function isSlotOccupied(startMinutes, serviceDuration, occupiedTimes) {
+    const endMinutes = startMinutes + serviceDuration;
 
-    // Verificar si alguna hora ocupada colisiona con este slot
-    return occupiedTimes.some(occupiedTime => {
-        const [occHours, occMinutes] = occupiedTime.split(':').map(Number);
-        const occMinutesTotal = occHours * 60 + occMinutes;
+    // Verificar si alguna cita ocupada colisiona con este slot
+    return occupiedTimes.some(occupied => {
+        const [occHours, occMinutes] = occupied.time.split(':').map(Number);
+        const occStartMinutes = occHours * 60 + occMinutes;
+        const occEndMinutes = occStartMinutes + occupied.duration;
         
-        // Hay colisión si el slot ocupado está dentro del rango del servicio
-        return occMinutesTotal < endMinutes && occMinutesTotal >= startMinutes;
+        // Hay colisión si:
+        // 1. El nuevo servicio empieza durante una cita existente
+        // 2. El nuevo servicio termina durante una cita existente
+        // 3. El nuevo servicio engloba completamente una cita existente
+        return (
+            (startMinutes >= occStartMinutes && startMinutes < occEndMinutes) || // Empieza durante
+            (endMinutes > occStartMinutes && endMinutes <= occEndMinutes) || // Termina durante
+            (startMinutes <= occStartMinutes && endMinutes >= occEndMinutes) // Engloba
+        );
     });
 }
 
@@ -241,14 +268,17 @@ async function handleBookingSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
+    const serviceFullText = document.getElementById('service').options[document.getElementById('service').selectedIndex].text;
+    const serviceName = serviceFullText.split(' - ')[0]; // Extrae "Corte de pelo" de "Corte de pelo - 11€ (30 min)"
+    
     const data = {
         nombre: formData.get('name'),
         email: formData.get('email'),
         barbero: formData.get('employee'),
-        servicio: document.getElementById('service').options[document.getElementById('service').selectedIndex].text,
+        servicio: serviceName, // Solo el nombre del servicio
         fecha: formData.get('date'),
         hora: formData.get('time'),
-        duracion: parseInt(currentService.dataset.duration)
+        duracion: currentServiceDuration
     };
 
     try {
@@ -276,6 +306,10 @@ async function handleBookingSubmit(e) {
         
         // Resetear formulario
         e.target.reset();
+        currentService = null;
+        currentServiceDuration = null;
+        currentDate = null;
+        currentEmployee = null;
         document.getElementById('time').disabled = true;
         document.getElementById('time').innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
         
