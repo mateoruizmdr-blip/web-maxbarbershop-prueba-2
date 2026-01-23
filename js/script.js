@@ -1,184 +1,417 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Configuration ---
-    const N8N_WEBHOOK_URL = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745';
+// ========================================
+// MAX STUDIO BARBER SHOP - SCRIPT PRINCIPAL
+// Conexión con n8n workflows
+// ========================================
 
-    // --- Selectors ---
-    const html = document.documentElement;
-    const header = document.getElementById('header');
-    const hamburger = document.querySelector('.hamburger');
-    const mobileMenu = document.querySelector('.mobile-menu');
-    const closeMenu = document.querySelector('.close-menu');
-    const menuLinks = document.querySelectorAll('.mobile-menu a');
+// URLs de los webhooks de n8n
+const WEBHOOK_GET_EVENTS = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745';
+const WEBHOOK_CREATE_APPOINTMENT = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718';
 
-    // Booking Form
-    const bookingForm = document.getElementById('bookingForm');
-    const serviceSelect = document.getElementById('service');
-    const dateInput = document.getElementById('date');
-    const timeSelect = document.getElementById('time');
+// Variables globales
+let occupiedSlots = {}; // Almacenará las horas ocupadas por barbero
+let currentDate = null;
+let currentEmployee = null;
+let currentService = null;
 
-    // Cancel Form
-    const cancelForm = document.getElementById('cancelForm');
+// ========================================
+// INICIALIZACIÓN
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
 
-    // Modal
-    const modal = document.getElementById('infoModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalMessage = document.getElementById('modalMessage');
-    const closeModalElements = document.querySelectorAll('.close-modal, #closeModalBtn');
+function initializeApp() {
+    setupDatePicker();
+    setupEventListeners();
+    setupMobileMenu();
+    setupSmoothScroll();
+    
+    // Cargar horas ocupadas al iniciar
+    loadOccupiedSlots();
+}
 
-    // --- Scroll Effects ---
-    window.addEventListener('scroll', () => {
-        if (window.scrollY > 50) {
-            header.classList.add('scrolled');
-        } else {
-            header.classList.remove('scrolled');
+// ========================================
+// CARGAR HORAS OCUPADAS DESDE N8N
+// ========================================
+async function loadOccupiedSlots() {
+    try {
+        console.log('Cargando horas ocupadas de los calendarios...');
+        
+        const response = await fetch(WEBHOOK_GET_EVENTS, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'getOccupiedSlots'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al obtener las horas ocupadas');
+        }
+
+        const data = await response.json();
+        console.log('Datos recibidos de n8n:', data);
+        
+        // Procesar los eventos para crear el objeto de horas ocupadas
+        processOccupiedSlots(data);
+        
+    } catch (error) {
+        console.error('Error al cargar horas ocupadas:', error);
+        showModal('Error', 'No se pudieron cargar las disponibilidades. Por favor, intenta de nuevo más tarde.');
+    }
+}
+
+function processOccupiedSlots(events) {
+    occupiedSlots = {
+        'Ayoub': {},
+        'Ragnar Ab': {},
+        'Yasin': {},
+        'Alejandro': {}
+    };
+
+    if (!Array.isArray(events)) {
+        console.error('Formato de eventos inválido');
+        return;
+    }
+
+    events.forEach(event => {
+        const barber = event.calendar || event.barbero;
+        const startTime = new Date(event.start || event.inicio);
+        const date = startTime.toISOString().split('T')[0];
+        const time = startTime.toTimeString().slice(0, 5);
+
+        if (occupiedSlots[barber]) {
+            if (!occupiedSlots[barber][date]) {
+                occupiedSlots[barber][date] = [];
+            }
+            occupiedSlots[barber][date].push(time);
         }
     });
 
-    // --- Mobile Menu Logic ---
-    const toggleMenu = (show) => {
-        mobileMenu.classList.toggle('active', show);
-        document.body.style.overflow = show ? 'hidden' : '';
-    };
+    console.log('Horas ocupadas procesadas:', occupiedSlots);
+}
 
-    hamburger.addEventListener('click', () => toggleMenu(true));
-    closeMenu.addEventListener('click', () => toggleMenu(false));
-    menuLinks.forEach(link => link.addEventListener('click', () => toggleMenu(false)));
+// ========================================
+// CONFIGURACIÓN FECHA MÍNIMA
+// ========================================
+function setupDatePicker() {
+    const dateInput = document.getElementById('date');
+    const today = new Date();
+    today.setDate(today.getDate() + 1); // Mínimo mañana
+    dateInput.min = today.toISOString().split('T')[0];
+    
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    dateInput.max = maxDate.toISOString().split('T')[0];
+}
 
-    // --- Booking System Logic ---
+// ========================================
+// EVENT LISTENERS
+// ========================================
+function setupEventListeners() {
+    const form = document.getElementById('bookingForm');
+    const cancelForm = document.getElementById('cancelForm');
+    const serviceSelect = document.getElementById('service');
+    const dateInput = document.getElementById('date');
+    const employeeSelect = document.getElementById('employee');
+    const timeSelect = document.getElementById('time');
 
-    // Restrict date to today onwards
-    const today = new Date().toISOString().split('T')[0];
-    dateInput.setAttribute('min', today);
+    // Listener para cambios en servicio
+    serviceSelect.addEventListener('change', function() {
+        currentService = this.options[this.selectedIndex];
+        updateAvailableSlots();
+    });
 
-    function updateTimeSlots() {
-        const selectedDate = dateInput.value;
-        const selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
+    // Listener para cambios en fecha
+    dateInput.addEventListener('change', function() {
+        currentDate = this.value;
+        updateAvailableSlots();
+    });
 
-        timeSelect.innerHTML = '';
+    // Listener para cambios en barbero
+    employeeSelect.addEventListener('change', function() {
+        currentEmployee = this.value;
+        updateAvailableSlots();
+    });
+
+    // Listener para envío del formulario
+    form.addEventListener('submit', handleBookingSubmit);
+    cancelForm.addEventListener('submit', handleCancelSubmit);
+}
+
+// ========================================
+// ACTUALIZAR SLOTS DISPONIBLES
+// ========================================
+function updateAvailableSlots() {
+    const timeSelect = document.getElementById('time');
+    
+    if (!currentService || !currentDate || !currentEmployee) {
         timeSelect.disabled = true;
+        timeSelect.innerHTML = '<option value="">Selecciona servicio, barbero y fecha primero</option>';
+        return;
+    }
 
-        if (!selectedDate || !selectedServiceOption.value) {
-            timeSelect.innerHTML = '<option value="">Primero elige servicio y fecha</option>';
-            return;
-        }
+    const duration = parseInt(currentService.dataset.duration);
+    const availableSlots = generateTimeSlots(currentDate, currentEmployee, duration);
+    
+    timeSelect.disabled = false;
+    timeSelect.innerHTML = '';
 
-        const duration = parseInt(selectedServiceOption.getAttribute('data-duration')) || 30;
-        const startHour = 11;
-        const endHour = 21;
+    if (availableSlots.length === 0) {
+        timeSelect.innerHTML = '<option value="">No hay disponibilidad</option>';
+        timeSelect.disabled = true;
+    } else {
+        timeSelect.innerHTML = '<option value="">Selecciona una hora</option>';
+        availableSlots.forEach(slot => {
+            const option = document.createElement('option');
+            option.value = slot;
+            option.textContent = slot;
+            timeSelect.appendChild(option);
+        });
+    }
+}
 
-        const now = new Date();
-        const isToday = selectedDate === today;
+function generateTimeSlots(date, employee, serviceDuration) {
+    const slots = [];
+    const dayOfWeek = new Date(date).getDay();
+    
+    // Horario: 11:00 - 21:00, Domingo cerrado
+    if (dayOfWeek === 0) return slots;
 
-        let iterTime = new Date(selectedDate);
-        iterTime.setHours(startHour, 0, 0, 0);
+    const openTime = 11 * 60; // 11:00 en minutos
+    const closeTime = 21 * 60; // 21:00 en minutos
+    const interval = 15; // Intervalos de 15 minutos
 
-        let endTime = new Date(selectedDate);
-        endTime.setHours(endHour, 0, 0, 0);
+    // Obtener horas ocupadas para este barbero y fecha
+    const occupied = getOccupiedSlotsForEmployeeAndDate(employee, date);
 
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.text = "Selecciona una hora";
-        timeSelect.add(defaultOption);
-
-        let hasSlots = false;
-
-        while (iterTime < endTime) {
-            let slotValid = true;
-            if (isToday) {
-                const timeDiff = (iterTime - now) / 1000 / 60;
-                if (timeDiff < 60) slotValid = false; // Block if within 1 hour
+    for (let minutes = openTime; minutes < closeTime; minutes += interval) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        
+        // Verificar si hay suficiente tiempo antes del cierre
+        if (minutes + serviceDuration <= closeTime) {
+            // Verificar si esta hora está disponible
+            if (!isSlotOccupied(timeStr, serviceDuration, occupied)) {
+                slots.push(timeStr);
             }
-
-            if (slotValid) {
-                const timeStr = iterTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                const option = document.createElement('option');
-                option.value = timeStr;
-                option.text = timeStr;
-                timeSelect.add(option);
-                hasSlots = true;
-            }
-            iterTime.setMinutes(iterTime.getMinutes() + duration);
-        }
-
-        if (hasSlots) {
-            timeSelect.disabled = false;
-        } else {
-            timeSelect.innerHTML = '<option>No hay horas disponibles</option>';
         }
     }
 
-    serviceSelect.addEventListener('change', updateTimeSlots);
-    dateInput.addEventListener('change', updateTimeSlots);
+    return slots;
+}
 
-    // --- Modal Helpers ---
-    const showModal = (title, msg) => {
-        modalTitle.textContent = title;
-        modalMessage.textContent = msg;
-        modal.classList.add('active');
-        modal.style.display = 'flex';
-    };
-
-    const closeModal = () => {
-        modal.classList.remove('active');
-        setTimeout(() => modal.style.display = 'none', 300);
-    };
-
-    closeModalElements.forEach(el => el.addEventListener('click', closeModal));
-    window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-    // --- Form Submissions ---
-
-    bookingForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const submitBtn = bookingForm.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-
-        const data = {
-            nombre: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            barbero: document.getElementById('employee').value,
-            servicio: serviceSelect.options[serviceSelect.selectedIndex].text,
-            fecha: dateInput.value,
-            hora: timeSelect.value
-        };
-
-        if (!data.hora) {
-            showModal('Atención', 'Por favor, selecciona una hora para tu cita.');
-            return;
-        }
-
-        // UI Feedback
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> PROCESANDO...';
-
-        try {
-            const response = await fetch(N8N_WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-
-            if (response.ok) {
-                showModal('¡Cita Confirmada!', `Hola ${data.nombre}, tu cita ha sido reservada con éxito para el ${data.fecha} a las ${data.hora}.`);
-                bookingForm.reset();
-                updateTimeSlots();
-            } else {
-                throw new Error('Server error');
+function getOccupiedSlotsForEmployeeAndDate(employee, date) {
+    // Si es "Cualquiera", obtener slots ocupados de todos
+    if (employee === 'Cualquiera') {
+        let allOccupied = [];
+        Object.keys(occupiedSlots).forEach(barber => {
+            if (occupiedSlots[barber][date]) {
+                allOccupied = allOccupied.concat(occupiedSlots[barber][date]);
             }
-        } catch (error) {
-            console.error('Error:', error);
-            showModal('Error', 'No hemos podido procesar tu reserva. Inténtalo de nuevo o contacta con nosotros directamente.');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
+        });
+        return [...new Set(allOccupied)]; // Eliminar duplicados
+    }
+    
+    return occupiedSlots[employee]?.[date] || [];
+}
+
+function isSlotOccupied(timeStr, duration, occupiedTimes) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const endMinutes = startMinutes + duration;
+
+    // Verificar si alguna hora ocupada colisiona con este slot
+    return occupiedTimes.some(occupiedTime => {
+        const [occHours, occMinutes] = occupiedTime.split(':').map(Number);
+        const occMinutesTotal = occHours * 60 + occMinutes;
+        
+        // Hay colisión si el slot ocupado está dentro del rango del servicio
+        return occMinutesTotal < endMinutes && occMinutesTotal >= startMinutes;
+    });
+}
+
+// ========================================
+// MANEJO DE RESERVA
+// ========================================
+async function handleBookingSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = {
+        nombre: formData.get('name'),
+        email: formData.get('email'),
+        barbero: formData.get('employee'),
+        servicio: document.getElementById('service').options[document.getElementById('service').selectedIndex].text,
+        fecha: formData.get('date'),
+        hora: formData.get('time'),
+        duracion: parseInt(currentService.dataset.duration)
+    };
+
+    try {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+        const response = await fetch(WEBHOOK_CREATE_APPOINTMENT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error('Error al crear la cita');
         }
+
+        const result = await response.json();
+        console.log('Cita creada:', result);
+
+        // Mostrar confirmación
+        showBookingConfirmation(data);
+        
+        // Resetear formulario
+        e.target.reset();
+        document.getElementById('time').disabled = true;
+        document.getElementById('time').innerHTML = '<option value="">Selecciona servicio y fecha primero</option>';
+        
+        // Recargar horas ocupadas
+        await loadOccupiedSlots();
+
+    } catch (error) {
+        console.error('Error:', error);
+        showModal('Error', 'No se pudo completar la reserva. Por favor, inténtalo de nuevo.');
+    } finally {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'CONFIRMAR RESERVA';
+    }
+}
+
+function showBookingConfirmation(data) {
+    const fechaFormatted = new Date(data.fecha + 'T00:00:00').toLocaleDateString('es-ES', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
     });
 
-    cancelForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = document.getElementById('cancelEmail').value;
-        showModal('Cancelación en proceso', `Hemos recibido tu solicitud para el correo ${email}. Nuestro equipo la procesará a la brevedad.`);
-        cancelForm.reset();
+    const message = `
+        Tu cita ha sido confirmada exitosamente.<br><br>
+        <strong>Detalles de la reserva:</strong><br>
+        📅 Fecha: ${fechaFormatted}<br>
+        🕐 Hora: ${data.hora}<br>
+        ✂️ Servicio: ${data.servicio}<br>
+        💈 Barbero: ${data.barbero}<br><br>
+        Te hemos enviado un email de confirmación a <strong>${data.email}</strong>
+    `;
+
+    showModal('¡Cita Confirmada!', message);
+}
+
+// ========================================
+// CANCELACIÓN DE CITA
+// ========================================
+async function handleCancelSubmit(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('cancelEmail').value;
+    
+    try {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+        // Aquí se debería implementar la lógica de cancelación en n8n
+        // Por ahora mostramos un mensaje
+        showModal('Información', 'Para cancelar tu cita, por favor contacta directamente con la barbería.');
+
+    } catch (error) {
+        console.error('Error:', error);
+        showModal('Error', 'No se pudo procesar la cancelación.');
+    } finally {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'CANCELAR CITA';
+    }
+}
+
+// ========================================
+// MODAL
+// ========================================
+function showModal(title, message) {
+    const modal = document.getElementById('infoModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    
+    modalTitle.textContent = title;
+    modalMessage.innerHTML = message;
+    modal.style.display = 'flex';
+    
+    // Cerrar modal
+    const closeBtn = document.querySelector('.close-modal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    
+    closeBtn.onclick = () => modal.style.display = 'none';
+    closeModalBtn.onclick = () => modal.style.display = 'none';
+    
+    window.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    };
+}
+
+// ========================================
+// MENÚ MÓVIL
+// ========================================
+function setupMobileMenu() {
+    const hamburger = document.querySelector('.hamburger');
+    const mobileMenu = document.querySelector('.mobile-menu');
+    const closeMenu = document.querySelector('.close-menu');
+    const mobileLinks = document.querySelectorAll('.mobile-menu a');
+
+    hamburger.addEventListener('click', () => {
+        mobileMenu.classList.add('active');
     });
-});
+
+    closeMenu.addEventListener('click', () => {
+        mobileMenu.classList.remove('active');
+    });
+
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            mobileMenu.classList.remove('active');
+        });
+    });
+}
+
+// ========================================
+// SCROLL SUAVE
+// ========================================
+function setupSmoothScroll() {
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Header transparente al hacer scroll
+    window.addEventListener('scroll', () => {
+        const header = document.getElementById('header');
+        if (window.scrollY > 50) {
+            header.style.background = 'rgba(17, 17, 17, 0.95)';
+        } else {
+            header.style.background = 'rgba(17, 17, 17, 0.9)';
+        }
+    });
+}
