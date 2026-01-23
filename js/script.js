@@ -139,7 +139,7 @@ function setupEventListeners() {
     serviceSelect.addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
         currentService = selectedOption.text.split(' - ')[0]; // Extrae solo el nombre del servicio
-        currentServiceDuration = SERVICE_DURATIONS[currentService] || 30;
+        currentServiceDuration = parseInt(selectedOption.getAttribute('data-duration')) || 30;
         console.log('Servicio seleccionado:', currentService, 'Duración:', currentServiceDuration);
         updateAvailableSlots();
     });
