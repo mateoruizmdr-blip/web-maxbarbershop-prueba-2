@@ -51,6 +51,7 @@ async function loadOccupiedSlots() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
             },
             body: JSON.stringify({
                 action: 'getOccupiedSlots'
@@ -290,6 +291,7 @@ async function handleBookingSubmit(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
             },
             body: JSON.stringify(data)
         });
