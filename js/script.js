@@ -4,8 +4,8 @@
 // ========================================
 
 // URLs de los webhooks de n8n
-const WEBHOOK_GET_EVENTS = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/eee10825-ff7e-4622-8ba9-37596ffd9745';
-const WEBHOOK_CREATE_APPOINTMENT = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook-test/ec2331d9-fca8-482b-920e-aedce6dfc718';
+const WEBHOOK_GET_EVENTS = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook/eee10825-ff7e-4622-8ba9-37596ffd9745';
+const WEBHOOK_CREATE_APPOINTMENT = 'https://unstormable-trothless-gilberto.ngrok-free.dev/webhook/ec2331d9-fca8-482b-920e-aedce6dfc718';
 
 // Duraciones de servicios en minutos
 const SERVICE_DURATIONS = {
